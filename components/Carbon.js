@@ -11,6 +11,7 @@ hljs.registerLanguage('javascript', javascript)
 
 import SpinnerWrapper from './SpinnerWrapper'
 import WindowControls from './WindowControls'
+import EmojiesOverlay from './EmojiesOverlay'
 
 import {
   COLORS,
@@ -165,23 +166,25 @@ class Carbon extends React.PureComponent {
       <div className="container">
         <div className="wrapper">
           <div className="slider">
-            {config.windowControls ? (
-              <WindowControls
-                theme={config.windowTheme}
-                code={this.props.children}
-                copyable={this.props.copyable}
-                light={light}
+            <EmojiesOverlay>
+              {config.windowControls ? (
+                <WindowControls
+                  theme={config.windowTheme}
+                  code={this.props.children}
+                  copyable={this.props.copyable}
+                  light={light}
+                />
+              ) : null}
+              <CodeMirror
+                ref={this.props.editorRef}
+                className={`CodeMirror__container window-theme__${config.windowTheme}`}
+                value={this.props.children}
+                options={options}
+                onBeforeChange={this.onBeforeChange}
+                onGutterClick={this.props.onGutterClick}
+                onSelection={this.onSelection}
               />
-            ) : null}
-            <CodeMirror
-              ref={this.props.editorRef}
-              className={`CodeMirror__container window-theme__${config.windowTheme}`}
-              value={this.props.children}
-              options={options}
-              onBeforeChange={this.onBeforeChange}
-              onGutterClick={this.props.onGutterClick}
-              onSelection={this.onSelection}
-            />
+            </EmojiesOverlay>
           </div>
         </div>
         {config.watermark && <Watermark light={light} />}

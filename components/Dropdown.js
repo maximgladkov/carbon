@@ -5,6 +5,7 @@ import VisuallyHidden from '@reach/visually-hidden'
 import { Down as ArrowDown } from './svg/Arrows'
 import CheckMark from './svg/Checkmark'
 import { COLORS } from '../lib/constants'
+import Popout from './Popout'
 
 class Dropdown extends React.PureComponent {
   state = {
@@ -121,7 +122,7 @@ const renderDropdown = ({ color, list, itemWrapper, icon, disableInput, title, l
       >
         {selectedItem.name}
       </SelectedItem>
-      {isOpen ? (
+      <Popout hidden={!isOpen}>
         <ListItems color={color}>
           {list.map((item, index) => (
             <ListItem
@@ -139,7 +140,7 @@ const renderDropdown = ({ color, list, itemWrapper, icon, disableInput, title, l
             </ListItem>
           ))}
         </ListItems>
-      ) : null}
+      </Popout>
     </DropdownContainer>
   )
 }
@@ -259,16 +260,14 @@ const SelectedItem = ({
   )
 }
 
-const ListItems = ({ children, color }) => {
+const ListItems = ({ children }) => {
   return (
     <ul role="listbox" className="dropdown-list">
       {children}
       <style jsx>
         {`
           .dropdown-list {
-            margin-top: -2px;
-            border: 2px solid ${color || COLORS.SECONDARY};
-            border-radius: 0 0 3px 3px;
+            margin: 0;
             max-height: 350px;
             overflow-y: scroll;
           }
@@ -294,6 +293,7 @@ const ListItem = ({ children, color, isHighlighted, isSelected, itemWrapper, ite
           .dropdown-list-item {
             display: flex;
             align-items: center;
+            justify-content: space-between;
             background: ${isHighlighted ? COLORS.HOVER : COLORS.BLACK};
             padding: 8px 16px;
             border-bottom: 1px solid ${itemColor};
@@ -309,6 +309,7 @@ const ListItem = ({ children, color, isHighlighted, isSelected, itemWrapper, ite
           .dropdown-list-item-text {
             flex-grow: 1;
             color: ${itemColor};
+            margin-right: 1rem;
           }
         `}
       </style>

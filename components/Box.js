@@ -1,27 +1,24 @@
 import React from 'react'
+import map from 'lodash.map'
+import kebabCase from 'lodash.kebabcase'
 
 const Box = props => {
+  const { children, className, ...styleProps } = props
+
   return (
-    <div className="box">
-      {props.children}
+    <div className={`box ${className}`}>
+      {children}
       <style jsx>
         {`
           .box {
-            display: ${props.display};
-            margin-top: ${props.marginTop};
-            margin-bottom: ${props.marginBottom};
-            ${props.justifyContent && `justify-content: ${props.justifyContent};`}
+            ${map(styleProps, (value, key) => {
+              return `${kebabCase(key)}: ${value};`
+            }).join('\n')}
           }
         `}
       </style>
     </div>
   )
-}
-
-Box.defaultProps = {
-  display: 'block',
-  marginTop: 0,
-  marginBottom: 0
 }
 
 export default Box

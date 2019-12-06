@@ -4,15 +4,17 @@ import domtoimage from 'dom-to-image'
 import Dropzone from 'dropperx'
 import debounce from 'lodash.debounce'
 import dynamic from 'next/dynamic'
+import 'emoji-mart/css/emoji-mart.css'
+import appleEmojies from 'emoji-mart/data/apple.json'
+import { NimblePicker } from 'emoji-mart'
 
 // Ours
 import ApiContext from './ApiContext'
+import EmojiesContext from './EmojiesContext'
 import Dropdown from './Dropdown'
 import Settings from './Settings'
-import Toolbar from './Toolbar'
 import Box from './Box'
 import Overlay from './Overlay'
-import AspectRatioButtons from './AspectRatioButtons'
 import BackgroundSelect from './BackgroundSelect'
 import Carbon from './Carbon'
 import ExportMenu from './ExportMenu'
@@ -20,6 +22,7 @@ import Themes from './Themes'
 import TweetButton from './TweetButton'
 import FontFace from './FontFace'
 import LanguageIcon from './svg/Language'
+import AspectRatioIcon from './svg/AspectRatio'
 import {
   LANGUAGES,
   LANGUAGE_MIME_HASH,
@@ -32,12 +35,16 @@ import {
   DEFAULT_SETTINGS,
   DEFAULT_LANGUAGE,
   DEFAULT_THEME,
-  FONTS
+  FONTS,
+  ASPECT_RATIOS,
+  ASPECT_RATIO_VALUE_HASH,
+  DEFAULT_ASPECT_RATIO
 } from '../lib/constants'
 import { serializeState, getRouteState } from '../lib/routing'
 import { getSettings, unescapeHtml, formatCode, omit } from '../lib/util'
 
 const languageIcon = <LanguageIcon />
+const aspectRatioIcon = <AspectRatioIcon />
 
 const SnippetToolbar = dynamic(() => import('./SnippetToolbar'), {
   loading: () => null
@@ -65,6 +72,8 @@ class Editor extends React.Component {
     this.resetDefaultSettings = this.resetDefaultSettings.bind(this)
     this.getCarbonImage = this.getCarbonImage.bind(this)
     this.onDrop = this.onDrop.bind(this)
+    this.onEmojiClick = this.onEmojiClick.bind(this)
+    this.onEmojiChange = this.onEmojiChange.bind(this)
   }
 
   async componentDidMount() {
@@ -290,6 +299,16 @@ class Editor extends React.Component {
     }
   }
 
+  updateAspectRatio(aspectRatio) {
+    if (aspectRatio) {
+      this.updateSetting('aspectRatio', aspectRatio.value)
+    }
+  }
+
+  updateEmojies(emojies) {
+    this.updateSetting('emojies', emojies)
+  }
+
   updateBackground({ photographer, ...changes } = {}) {
     if (photographer) {
       this.updateState(({ code = DEFAULT_CODE }) => ({
@@ -300,10 +319,6 @@ class Editor extends React.Component {
     } else {
       this.updateState({ ...changes, preset: null })
     }
-  }
-
-  updateAspectRatio(aspectRatio) {
-    this.updateSetting('aspectRatio', aspectRatio)
   }
 
   updateTheme = theme => this.updateState({ theme })
@@ -358,6 +373,25 @@ class Editor extends React.Component {
         })
       )
 
+  onEmojiClick(emoji) {
+    this.updateEmojies([
+      ...this.state.emojies,
+      { emoji: emoji.id, key: +new Date(), top: Math.random() * 100, left: Math.random() * 100 }
+    ])
+  }
+
+  onEmojiChange(emoji, index) {
+    const newEmojies = [...this.state.emojies]
+
+    if (emoji) {
+      newEmojies[index] = emoji
+    } else {
+      newEmojies.splice(index, 1)
+    }
+
+    this.updateEmojies(newEmojies)
+  }
+
   render() {
     const {
       highlights,
@@ -366,6 +400,7 @@ class Editor extends React.Component {
       backgroundImage,
       backgroundMode,
       code,
+      emojies,
       exportSize
     } = this.state
 
@@ -373,123 +408,191 @@ class Editor extends React.Component {
 
     const theme = this.getTheme()
 
+    const emojiesContext = [emojies, this.onEmojiChange]
+
     return (
-      <div className="editor">
-        <Box marginBottom="1rem">
-          <Toolbar>
-            <Themes
-              theme={theme}
-              highlights={highlights}
-              update={this.updateTheme}
-              updateHighlights={this.updateHighlights}
-              remove={this.removeTheme}
-              create={this.createTheme}
-              themes={this.props.themes}
-            />
-            <Dropdown
-              title="Language"
-              icon={languageIcon}
-              selected={
-                LANGUAGE_NAME_HASH[language] ||
-                LANGUAGE_MIME_HASH[language] ||
-                LANGUAGE_MODE_HASH[language] ||
-                LANGUAGE_MODE_HASH[DEFAULT_LANGUAGE]
-              }
-              list={LANGUAGES}
-              onChange={this.updateLanguage}
-            />
-            <div className="toolbar-second-row">
-              <BackgroundSelect
-                onChange={this.updateBackground}
-                updateHighlights={this.updateHighlights}
-                mode={backgroundMode}
-                color={backgroundColor}
-                image={backgroundImage}
-                carbonRef={this.carbonNode.current}
-              />
-              <Settings
-                {...config}
-                onChange={this.updateSetting}
-                resetDefaultSettings={this.resetDefaultSettings}
-                format={this.format}
-                applyPreset={this.applyPreset}
-                getCarbonImage={this.getCarbonImage}
-              />
-              <div id="style-editor-button" />
-              <div className="buttons">
-                <TweetButton onClick={this.upload} />
-                <ExportMenu
-                  onChange={this.updateSetting}
-                  exportImage={this.exportImage}
-                  exportSize={exportSize}
-                  backgroundImage={backgroundImage}
-                />
-              </div>
-            </div>
-          </Toolbar>
-        </Box>
-
-        <Dropzone accept="image/*, text/*, application/*" onDrop={this.onDrop}>
-          {({ canDrop }) => (
-            <Overlay
-              isOver={canDrop}
-              title={`Drop your file here to import ${canDrop ? '✋' : '✊'}`}
+      <EmojiesContext.Provider value={emojiesContext}>
+        <div className="editor">
+          <Box display="flex" flexDirection="row">
+            <Box
+              minWidth="680px"
+              backgroundColor={COLORS.HOVER}
+              borderRadius="3px"
+              overflow="hidden"
+              display="flex"
+              alignItems="center"
+              width="100%"
             >
-              {/*key ensures Carbon's internal language state is updated when it's changed by Dropdown*/}
-              <Carbon
-                key={language}
-                ref={this.carbonNode}
-                config={this.state}
-                onChange={this.updateCode}
-                loading={this.state.loading}
-                theme={theme}
-              >
-                {code != null ? code : DEFAULT_CODE}
-              </Carbon>
-            </Overlay>
-          )}
-        </Dropzone>
-        <Box marginTop="1rem" display="flex" justifyContent="center">
-          <Toolbar>
-            <AspectRatioButtons
-              aspectRatio={this.state.aspectRatio}
-              onChange={this.updateAspectRatio}
-            />
-          </Toolbar>
-        </Box>
-        {this.props.snippet && (
-          <SnippetToolbar
-            snippet={this.props.snippet}
-            onCreate={this.handleSnippetCreate}
-            onDelete={this.handleSnippetDelete}
-          />
-        )}
-        <FontFace {...config} />
-        <style jsx>
-          {`
-            .editor {
-              background: ${COLORS.BLACK};
-              border: 3px solid ${COLORS.SECONDARY};
-              border-radius: 8px;
-              padding: 16px;
-              position: relative;
-            }
+              <Box display="block" overflow="hidden" width="100%">
+                <Dropzone accept="image/*, text/*, application/*" onDrop={this.onDrop}>
+                  {({ canDrop }) => (
+                    <Overlay
+                      isOver={canDrop}
+                      title={`Drop your file here to import ${canDrop ? '✋' : '✊'}`}
+                    >
+                      {/*key ensures Carbon's internal language state is updated when it's changed by Dropdown*/}
+                      <Carbon
+                        key={language}
+                        ref={this.carbonNode}
+                        config={this.state}
+                        onChange={this.updateCode}
+                        loading={this.state.loading}
+                        theme={theme}
+                      >
+                        {code != null ? code : DEFAULT_CODE}
+                      </Carbon>
+                    </Overlay>
+                  )}
+                </Dropzone>
+              </Box>
+            </Box>
 
-            .buttons {
-              display: flex;
-              margin-left: auto;
-            }
-            .toolbar-second-row {
-              height: 40px;
-              display: flex;
-              flex: 1;
-            }
-            .toolbar-second-row > :global(div:not(:last-of-type)) {
-              margin-right: 0.5rem;
-            }
-          `}
-        </style>
-      </div>
+            <Box
+              marginLeft="1rem"
+              display="flex"
+              flexDirection="column"
+              justifyContent="space-between"
+            >
+              <Box>
+                <Box marginBottom="1rem">
+                  <Themes
+                    theme={theme}
+                    highlights={highlights}
+                    update={this.updateTheme}
+                    updateHighlights={this.updateHighlights}
+                    remove={this.removeTheme}
+                    create={this.createTheme}
+                    themes={this.props.themes}
+                  />
+                </Box>
+                <Box marginBottom="1rem">
+                  <Dropdown
+                    title="Language"
+                    icon={languageIcon}
+                    selected={
+                      LANGUAGE_NAME_HASH[language] ||
+                      LANGUAGE_MIME_HASH[language] ||
+                      LANGUAGE_MODE_HASH[language] ||
+                      LANGUAGE_MODE_HASH[DEFAULT_LANGUAGE]
+                    }
+                    list={LANGUAGES}
+                    onChange={this.updateLanguage}
+                  />
+                </Box>
+                <Box marginBottom="1rem">
+                  <Dropdown
+                    title="Aspect ratio"
+                    icon={aspectRatioIcon}
+                    selected={
+                      ASPECT_RATIO_VALUE_HASH[this.state.aspectRatio] ||
+                      ASPECT_RATIO_VALUE_HASH[DEFAULT_ASPECT_RATIO]
+                    }
+                    list={ASPECT_RATIOS}
+                    onChange={this.updateAspectRatio}
+                  />
+                </Box>
+                <Box marginBottom="1rem" className="toolbar-second-row">
+                  <BackgroundSelect
+                    onChange={this.updateBackground}
+                    updateHighlights={this.updateHighlights}
+                    mode={backgroundMode}
+                    color={backgroundColor}
+                    image={backgroundImage}
+                    carbonRef={this.carbonNode.current}
+                  />
+                  <Settings
+                    {...config}
+                    onChange={this.updateSetting}
+                    resetDefaultSettings={this.resetDefaultSettings}
+                    format={this.format}
+                    applyPreset={this.applyPreset}
+                    getCarbonImage={this.getCarbonImage}
+                  />
+                  <div id="style-editor-button" />
+                  <div className="buttons">
+                    <TweetButton onClick={this.upload} />
+                    <ExportMenu
+                      onChange={this.updateSetting}
+                      exportImage={this.exportImage}
+                      exportSize={exportSize}
+                      backgroundImage={backgroundImage}
+                    />
+                  </div>
+                </Box>
+              </Box>
+              <NimblePicker
+                set="apple"
+                data={appleEmojies}
+                showPreview={false}
+                showSkinTones={false}
+                emojiTooltip
+                onClick={this.onEmojiClick}
+              />
+            </Box>
+          </Box>
+          {this.props.snippet && (
+            <SnippetToolbar
+              snippet={this.props.snippet}
+              onCreate={this.handleSnippetCreate}
+              onDelete={this.handleSnippetDelete}
+            />
+          )}
+          <FontFace {...config} />
+          <style jsx>
+            {`
+              .editor {
+                background: ${COLORS.BLACK};
+                border: 3px solid ${COLORS.SECONDARY};
+                border-radius: 8px;
+                padding: 16px;
+                position: relative;
+              }
+              .buttons {
+                display: flex;
+                margin-left: auto;
+              }
+            `}
+          </style>
+          <style global jsx>
+            {`
+              .toolbar-second-row {
+                height: 40px;
+                display: flex;
+                flex: 1;
+              }
+              .toolbar-second-row > :global(div:not(:last-of-type)) {
+                margin-right: 0.5rem;
+              }
+              .emoji-mart {
+                border-radius: 3px;
+                background: ${COLORS.BLACK};
+                color: ${COLORS.SECONDARY};
+              }
+              .emoji-mart-category-label span {
+                background: ${COLORS.HOVER};
+                font-weight: normal;
+              }
+              .emoji-mart-category .emoji-mart-emoji:hover:before {
+                background: ${COLORS.HOVER};
+              }
+              .emoji-mart-search button {
+                color: ${COLORS.SECONDARY};
+              }
+              .emoji-mart-search svg path {
+                fill: currentColor;
+              }
+              .emoji-mart-search input {
+                background: ${COLORS.BLACK};
+                color: ${COLORS.SECONDARY};
+                border-radius: 3px;
+              }
+              .emoji-mart-search input:focus {
+                background: ${COLORS.HOVER};
+              }
+            `}
+          </style>
+        </div>
+      </EmojiesContext.Provider>
     )
   }
 }
