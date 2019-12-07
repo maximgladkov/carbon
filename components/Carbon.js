@@ -39,6 +39,7 @@ function noop() {}
 class Carbon extends React.PureComponent {
   static defaultProps = {
     onChange: noop,
+    onRename: noop,
     onGutterClick: noop
   }
   state = {}
@@ -73,6 +74,12 @@ class Carbon extends React.PureComponent {
   onBeforeChange = (editor, meta, code) => {
     if (!this.props.readOnly) {
       this.props.onChange(code)
+    }
+  }
+
+  onRename = e => {
+    if (!this.props.readOnly) {
+      this.props.onRename(e.target.value)
     }
   }
 
@@ -173,6 +180,8 @@ class Carbon extends React.PureComponent {
                   code={this.props.children}
                   copyable={this.props.copyable}
                   light={light}
+                  title={config.title}
+                  onChange={this.onRename}
                 />
               ) : null}
               <CodeMirror
