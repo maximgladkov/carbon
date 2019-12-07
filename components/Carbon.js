@@ -43,6 +43,18 @@ class Carbon extends React.PureComponent {
     onGutterClick: noop
   }
   state = {}
+  wrapperRef = React.createRef()
+
+  componentDidUpdate(prevProps) {
+    if (
+      prevProps.config.pages.length !== this.props.config.pages.length ||
+      prevProps.config.page !== this.props.config.page
+    ) {
+      if (this.wrapperRef.current) {
+        this.wrapperRef.current.scrollTop = this.props.scroll
+      }
+    }
+  }
 
   handleLanguageChange = debounce(
     (newCode, language) => {
@@ -137,6 +149,10 @@ class Carbon extends React.PureComponent {
     }
   }
 
+  onScroll = e => {
+    this.props.onScroll(e.target.scrollTop)
+  }
+
   render() {
     const config = { ...DEFAULT_SETTINGS, ...this.props.config }
 
@@ -171,7 +187,7 @@ class Carbon extends React.PureComponent {
     /* eslint-disable jsx-a11y/no-static-element-interactions */
     const content = (
       <div className="container">
-        <div className="wrapper">
+        <div ref={this.wrapperRef} className="wrapper" onScroll={this.onScroll}>
           <div className="slider">
             <EmojiesOverlay>
               {config.windowControls ? (
@@ -180,7 +196,7 @@ class Carbon extends React.PureComponent {
                   code={this.props.children}
                   copyable={this.props.copyable}
                   light={light}
-                  title={config.title}
+                  title={this.props.title}
                   onChange={this.onRename}
                 />
               ) : null}
@@ -261,7 +277,9 @@ class Carbon extends React.PureComponent {
                 this.props.config.backgroundMode === 'image'
                   ? `background: url(${backgroundImage});
                     background-size: cover;
-                    background-repeat: no-repeat;`
+                    background-repeat: no-repeat;
+                    background-position: ${(100.0 / (this.props.config.pages.length - 1)) *
+                      this.props.config.page}% 0%;`
                   : `background: ${this.props.config.backgroundColor || config.backgroundColor};
                     background-size: auto;
                     background-repeat: repeat;`

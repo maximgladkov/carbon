@@ -3,10 +3,10 @@ import map from 'lodash.map'
 import kebabCase from 'lodash.kebabcase'
 
 const Box = props => {
-  const { children, className, ...styleProps } = props
+  const { children, className = '', onClick, ...styleProps } = props
 
   return (
-    <div className={`box ${className}`}>
+    <div role="button" tabIndex={0} className={`box ${className}`} onClick={onClick}>
       {children}
       <style jsx>
         {`

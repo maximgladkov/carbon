@@ -28,6 +28,7 @@ class BackgroundSelect extends React.PureComponent {
       mode,
       image,
       onChange,
+      pagesCount,
       isVisible,
       toggleVisibility,
       carbonRef,
@@ -36,7 +37,9 @@ class BackgroundSelect extends React.PureComponent {
 
     const background = validateColor(color) ? color : DEFAULT_BG_COLOR
 
-    const aspectRatio = carbonRef ? carbonRef.clientWidth / carbonRef.clientHeight : 1
+    const aspectRatio = carbonRef
+      ? (carbonRef.clientWidth * pagesCount) / carbonRef.clientHeight
+      : 1
 
     return (
       <div className="bg-select-container">

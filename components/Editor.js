@@ -1,7 +1,7 @@
 // Theirs
 import React from 'react'
 import domtoimage from 'dom-to-image'
-import Dropzone from 'dropperx'
+import Dropzone from 'maximgladkov-dropperx'
 import debounce from 'lodash.debounce'
 import dynamic from 'next/dynamic'
 import 'emoji-mart/css/emoji-mart.css'
@@ -15,6 +15,7 @@ import Dropdown from './Dropdown'
 import Settings from './Settings'
 import Box from './Box'
 import Overlay from './Overlay'
+import Pagination from './Pagination'
 import BackgroundSelect from './BackgroundSelect'
 import Carbon from './Carbon'
 import ExportMenu from './ExportMenu'
@@ -52,16 +53,26 @@ const SnippetToolbar = dynamic(() => import('./SnippetToolbar'), {
 
 const getConfig = omit(['code'])
 
+const extractPages = state => {
+  const { title, code, highlights, emojies, scroll, pages, ...otherState } = state
+
+  return {
+    ...otherState,
+    pages: pages || [{ title, code, highlights, emojies, scroll }]
+  }
+}
+
 class Editor extends React.Component {
   static contextType = ApiContext
 
   constructor(props) {
     super(props)
-    this.state = {
+
+    this.state = extractPages({
       ...DEFAULT_SETTINGS,
       ...this.props.snippet,
       loading: true
-    }
+    })
 
     this.exportImage = this.exportImage.bind(this)
     this.upload = this.upload.bind(this)
@@ -69,6 +80,11 @@ class Editor extends React.Component {
     this.updateLanguage = this.updateLanguage.bind(this)
     this.updateBackground = this.updateBackground.bind(this)
     this.updateAspectRatio = this.updateAspectRatio.bind(this)
+    this.updateEmojies = this.updateEmojies.bind(this)
+    this.updateScroll = this.updateScroll.bind(this)
+    this.addPage = this.addPage.bind(this)
+    this.updatePage = this.updatePage.bind(this)
+    this.removePage = this.removePage.bind(this)
     this.resetDefaultSettings = this.resetDefaultSettings.bind(this)
     this.getCarbonImage = this.getCarbonImage.bind(this)
     this.onDrop = this.onDrop.bind(this)
@@ -118,10 +134,28 @@ class Editor extends React.Component {
     trailing: true,
     leading: true
   })
-  updateState = updates => this.setState(updates, () => this.onUpdate(this.state))
 
-  updateCode = code => this.updateState({ code })
-  updateTitle = title => this.updateState({ title })
+  updateState = updates => {
+    this.setState(updates, () => this.onUpdate(this.state))
+  }
+
+  updatePageState = updates =>
+    this.setState(
+      state => {
+        const newPages = [...state.pages]
+        const page = newPages[state.page]
+        const changes = typeof updates === 'function' ? updates(page) : updates
+
+        newPages[state.page] = { ...page, ...changes }
+
+        return { ...state, pages: newPages }
+      },
+      () => this.onUpdate(this.state)
+    )
+
+  updateTitle = title => this.updatePageState({ title })
+
+  updateCode = code => this.updatePageState({ code })
 
   async getCarbonImage(
     {
@@ -246,6 +280,7 @@ class Editor extends React.Component {
 
   updateSetting(key, value) {
     this.updateState({ [key]: value })
+
     if (Object.prototype.hasOwnProperty.call(DEFAULT_SETTINGS, key) && key !== 'preset') {
       this.updateState({ preset: null })
     }
@@ -271,7 +306,7 @@ class Editor extends React.Component {
   }
 
   resetDefaultSettings() {
-    this.updateState(DEFAULT_SETTINGS)
+    this.updateState(extractPages(DEFAULT_SETTINGS))
     this.props.onReset()
   }
 
@@ -281,16 +316,34 @@ class Editor extends React.Component {
     )
   }
 
-  onDrop([file]) {
-    if (isImage(file)) {
-      this.updateState({
-        backgroundImage: file.content,
-        backgroundImageSelection: null,
-        backgroundMode: 'image',
-        preset: null
-      })
-    } else {
-      this.updateState({ code: file.content, language: 'auto' })
+  onDrop(files) {
+    if (files.length === 1) {
+      const [file] = files
+
+      if (isImage(file)) {
+        this.updateState({
+          backgroundImage: file.content,
+          backgroundImageSelection: null,
+          backgroundMode: 'image',
+          preset: null
+        })
+      } else {
+        this.updatePageState({ code: file.content, language: 'auto' })
+      }
+    } else if (files.length > 1) {
+      this.updateState(state => ({
+        pages: [
+          ...state.pages,
+          ...files.map(file => ({
+            title: file.name,
+            code: file.content,
+            scroll: 0,
+            highlights: [],
+            emojies: []
+          }))
+        ],
+        language: 'auto'
+      }))
     }
   }
 
@@ -307,7 +360,40 @@ class Editor extends React.Component {
   }
 
   updateEmojies(emojies) {
-    this.updateSetting('emojies', emojies)
+    this.updatePageState(state => ({ emojies: emojies(state.emojies) }))
+  }
+
+  updateScroll(scroll) {
+    this.updatePageState({ scroll })
+  }
+
+  updatePage(page) {
+    this.updateSetting('page', page)
+  }
+
+  addPage() {
+    this.updateState(state => {
+      return {
+        pages: [...state.pages, { title: '', code: '', scroll: 0, highlights: [], emojies: [] }]
+      }
+    })
+    this.updateSetting('page', this.state.page + 1)
+  }
+
+  removePage(page) {
+    this.updateState(state => {
+      const newPages = state.pages
+      newPages.splice(page, 1)
+
+      if (newPages.length === 0) {
+        newPages.push({ title: '', code: '', scroll: 0, highlights: [], emojies: [] })
+      }
+
+      return {
+        page: Math.max(state.page - 1, page - 1, 0),
+        pages: [...newPages]
+      }
+    })
   }
 
   updateBackground({ photographer, ...changes } = {}) {
@@ -323,8 +409,9 @@ class Editor extends React.Component {
   }
 
   updateTheme = theme => this.updateState({ theme })
-  updateHighlights = updates =>
-    this.setState(({ highlights = {} }) => ({
+
+  updatePageHighlights = updates =>
+    this.updatePageState(({ highlights = {} }) => ({
       highlights: {
         ...highlights,
         ...updates
@@ -375,35 +462,38 @@ class Editor extends React.Component {
       )
 
   onEmojiClick(emoji) {
-    this.updateEmojies([
-      ...this.state.emojies,
+    this.updateEmojies(emojies => [
+      ...emojies,
       { emoji: emoji.id, key: +new Date(), top: Math.random() * 100, left: Math.random() * 100 }
     ])
   }
 
   onEmojiChange(emoji, index) {
-    const newEmojies = [...this.state.emojies]
+    this.updateEmojies(emojies => {
+      const newEmojies = [...emojies]
 
-    if (emoji) {
-      newEmojies[index] = emoji
-    } else {
-      newEmojies.splice(index, 1)
-    }
+      if (emoji) {
+        newEmojies[index] = emoji
+      } else {
+        newEmojies.splice(index, 1)
+      }
 
-    this.updateEmojies(newEmojies)
+      return newEmojies
+    })
   }
 
   render() {
     const {
-      highlights,
       language,
       backgroundColor,
       backgroundImage,
       backgroundMode,
-      code,
-      emojies,
-      exportSize
+      exportSize,
+      page,
+      pages
     } = this.state
+
+    const { highlights, title, code, emojies, scroll } = pages[page] || {}
 
     const config = getConfig(this.state)
 
@@ -436,7 +526,10 @@ class Editor extends React.Component {
                         key={language}
                         ref={this.carbonNode}
                         config={this.state}
+                        title={title}
+                        scroll={scroll}
                         onChange={this.updateCode}
+                        onScroll={this.updateScroll}
                         onRename={this.updateTitle}
                         loading={this.state.loading}
                         theme={theme}
@@ -500,6 +593,7 @@ class Editor extends React.Component {
                     mode={backgroundMode}
                     color={backgroundColor}
                     image={backgroundImage}
+                    pagesCount={pages.length}
                     carbonRef={this.carbonNode.current}
                   />
                   <Settings
@@ -531,6 +625,15 @@ class Editor extends React.Component {
                 onClick={this.onEmojiClick}
               />
             </Box>
+          </Box>
+          <Box marginTop="1rem">
+            <Pagination
+              pages={pages}
+              page={page}
+              onAdd={this.addPage}
+              onChange={this.updatePage}
+              onRemove={this.removePage}
+            />
           </Box>
           {this.props.snippet && (
             <SnippetToolbar
